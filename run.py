@@ -85,7 +85,7 @@ mutation={}
 echo "1
 1" | gmx pdb2gmx -f ../seeds/$mutation/$filestem-chainC-$mutation-0.pdb -o $filestem-chainC-$mutation-1.gro -p $filestem-chainC-$mutation.top -i $filestem-chainC-$mutation\_posre.itp
 
-{}/pmx/scripts/generate_hybrid_topology.py -p $filestem-chainC-$mutation.top -o $filestem-chainC-$mutation-1 -ff amber99sb-star-ildn-mut.ff -split
+{}/pmx/scripts/generate_hybrid_topology.py -p $filestem-chainC-$mutation.top -o $filestem-chainC-$mutation-1 -ff amber99sb-star-ildn-mut.ff
 
     '''.format(GMXRC, filestem, mutation, pmx_root)
 
@@ -105,15 +105,9 @@ def get_itp_script(mutation):
 mutation={}
 time={}
 
-awk 'NR>1 {{print $0}}' rpob-5uh6-3-md-1-$time-chainC-$mutation-1_qoff.top > rpob-5uh6-rnap_beta_$mutation-11.itp
-awk 'NR>1 {{print $0}}' rpob-5uh6-3-md-1-$time-chainC-$mutation-1_vdw.top > rpob-5uh6-rnap_beta_$mutation-12.itp
-awk 'NR>1 {{print $0}}' rpob-5uh6-3-md-1-$time-chainC-$mutation-1_qon.top > rpob-5uh6-rnap_beta_$mutation-13.itp
-perl -pi -e 's/Protein_chain_C/RNAP_BETA/g' rpob-5uh6-rnap_beta_$mutation-11.itp
-perl -pi -e 's/Protein_chain_C/RNAP_BETA/g' rpob-5uh6-rnap_beta_$mutation-12.itp
-perl -pi -e 's/Protein_chain_C/RNAP_BETA/g' rpob-5uh6-rnap_beta_$mutation-13.itp
-perl -pi -e 's/3-md-1-'$time'-chainC-/rnap_beta_/g' rpob-5uh6-rnap_beta_$mutation-11.itp
-perl -pi -e 's/3-md-1-'$time'-chainC-/rnap_beta_/g' rpob-5uh6-rnap_beta_$mutation-12.itp
-perl -pi -e 's/3-md-1-'$time'-chainC-/rnap_beta_/g' rpob-5uh6-rnap_beta_$mutation-13.itp
+awk 'NR>1 {{print $0}}' rpob-5uh6-3-md-1-$time-chainC-$mutation-1.top > rpob-5uh6-rnap_beta_$mutation.itp
+perl -pi -e 's/Protein_chain_C/RNAP_BETA/g' rpob-5uh6-rnap_beta_$mutation.itp
+perl -pi -e 's/3-md-1-'$time'-chainC-/rnap_beta_/g' rpob-5uh6-rnap_beta_$mutation.itp
 cp rpob-5uh6-3-md-1-$time-chainC-$mutation\_posre.itp rpob-5uh6-rnap_beta_$mutation\_posre.itp
 
     '''.format(mutation, timestep)
@@ -151,6 +145,22 @@ def mutate(mutation):
     hack_apo = get_hack_apo_script(mutation.name, num_atoms)
     os.system(hack_apo)
 
+def clean_topo(mutation):
+    '''
+    Function to remove some extra lines that are not needed at the end of the topology file
+    If these lines are left in there is some conflict about what force fields to use.
+    :param mutation:
+    :return:
+    '''
+
+    top_file = os.path.join(cwd, '../generate-topology/rpob-5uh6-rnap_beta_{}.itp'.format(mutation.name))
+    with open(top_file) as f:
+        to_write = f.readlines()[:-10]
+        to_write = ''.join(to_write)
+
+    with open(top_file, 'w') as f:
+        f.write(to_write)
+
 def setup(mutation):
     '''
     Wrapper arrond the function required to setup the mutant systems.
@@ -159,6 +169,7 @@ def setup(mutation):
     '''
     mutate(mutation)
     gen_topo(mutation)
+    clean_topo(mutation)
 
 def write_full_tops(mutation, leg):
     '''
@@ -177,8 +188,8 @@ def write_full_tops(mutation, leg):
         sys_name = 'bound'
         mol = 'RFP                  1'
 
-    for state in [11, 12, 13]:
-        template = '''; Include forcefield parameters
+
+    template = '''; Include forcefield parameters
 #include "amber99sb-star-ildn-mut.ff/forcefield.itp"
 
 #include "../../build/atomtypes.itp"
@@ -191,7 +202,7 @@ def write_full_tops(mutation, leg):
 
 #include "../../build/5uh6-rnap_alpha_1.itp"
 #include "../../build/5uh6-rnap_alpha_2.itp"
-#include "../../generate-topology/rpob-5uh6-rnap_beta_s450l-{}.itp"
+#include "../../generate-topology/rpob-5uh6-rnap_beta_s450l.itp"
 #include "../../build/5uh6-rnap_beta_prime.itp"
 #include "../../build/5uh6-rnap_omega.itp"
 #include "../../build/5uh6-rnap_sigma.itp"
@@ -220,43 +231,13 @@ ZN                   2
 MG                   1
 SOL             114838
 NA                 127
-        '''.format(state, include, mutation, sys_name, mol)
+        '''.format(include, mutation, sys_name, mol)
 
 
-        file_name = 'rpob-5uh6-{}-{}-{}.top'.format(mutation, leg, state)
-        with open(os.path.join(cwd, mutation, file_name), 'w') as f:
-            f.write(template)
+    file_name = 'rpob-5uh6-{}-{}.top'.format(mutation, leg)
+    with open(os.path.join(cwd, mutation, file_name), 'w') as f:
+        f.write(template)
 ##END SETUP
-
-##START RUN
-def get_run():
-    print('Creating run lines...')
-
-    stages = {'grow': [], 'eq0': [], 'eq1': [], 'eq2': [], 'sim1': []}
-
-    stages['grow'] = prep_grow()
-    stages['eq0']  = prep_eq0()
-    stages['eq1']  = prep_eq1()
-    stages['eq2']  = pre_eq2()
-    stages['sim1'] = prep_sim1()
-
-    return stages
-
-def prep_grow():
-    pass
-
-def prep_eq0():
-    pass
-
-def prep_eq1():
-    pass
-
-def pre_eq2():
-    pass
-
-def prep_sim1():
-    pass
-##END RUN
 
 class Mutation():
     def __init__(self, og, target, res_id, shift):
