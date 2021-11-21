@@ -33,10 +33,7 @@ def main():
                     for state in lambdas:
                         for rep in reps:
                             if state.win_type == 'q':
-                                root = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
-                                gro = os.path.join(seeds_dir, mut, 'rpob-5uh6-3-md-1-0ns-{}-{}.gro'.format(mut, leg))
-                                out = os.path.join(root, 'bed_out.gro')
-                                os.system('cp {} {}'.format(gro, out))
+                                continue
                             else:
                                 mdp = os.path.join(ref_dir, 'alchembed.mdp')
                                 gro = os.path.join(seeds_dir, mut, 'rpob-5uh6-3-md-1-0ns-{}-{}.gro'.format(mut, leg))
@@ -81,6 +78,27 @@ def main():
                                 run_line = ' '.join([jsrun, './bash_scripts/{}{}{}{}'.format(mut, leg, state.num, rep), '&\n'])
                                 f.write(run_line)
             f.write('wait\n')
+
+            #copy bed grow files from vdw runs to q runs
+            for mut in group:
+                for leg in legs:
+                    for state in lambdas:
+                        for rep in reps:
+                            if state.win_type == 'q':
+                                if int(state.num) < 3:
+                                    src = os.path.join(seeds_dir, mut, leg, str(3), str(rep), 'bed_out.gro')
+                                    dest = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                                    run_line = ' '.join([jsrun, 'cp {} {}'.format(src, dest), '&\n'])
+                                    f.write(run_line)
+                                else:
+                                    src = os.path.join(seeds_dir, mut, leg, str(9), str(rep), 'bed_out.gro')
+                                    dest = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                                    run_line = ' '.join([jsrun, 'cp {} {}'.format(src, dest), '&\n'])
+                                    f.write(run_line)
+                            else:
+                                continue
+            f.write('wait\n')
+
 
             #gromp warming sims
             for mut in group:
@@ -203,7 +221,7 @@ class Window():
 
 if __name__ == '__main__':
     # define mutants
-    all_muts = ['s450l', 'h445n']
+    all_muts = ['s450l', 'i491f']
 
     # build lambdas
     state_id = [11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13]

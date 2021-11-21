@@ -215,7 +215,7 @@ def write_full_tops(mutation, leg):
         sys_name = 'un-bound'
         mol = include
     else:
-        include = '#include \"rpob-5uh6-rfp-1.itp\"'
+        include = '#include \"../../build/5uh6-rfp-1.itp\"'
         sys_name = 'bound'
         mol = 'RFP                  1'
 
@@ -315,7 +315,9 @@ def main():
     # Iterate over requested muataions
     # this preps both apo and drug legs
     for mut in mutations:
-
+        if os.path.isdir(os.path.join(cwd, mut.name)):
+            print('Folder found for {} ... Skipping'.format(mut.name))
+            continue
         # from seed files build mutant inputs
         setup(mut)
         for leg in legs:
@@ -348,7 +350,7 @@ if __name__ == "__main__":
     mutations = get_mutations('./all_muts.dat')
 
     #filer the mutations down, useful to test one at a time
-    filter_ = [71]
+    filter_ = range(0, 71)
     mutations = [mutations[x] for x in filter_]
 
     #there are two legs to the simulations without and with drug.
