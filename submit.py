@@ -16,11 +16,13 @@ def make_all_dirs(muts_to_build):
                     os.mkdir(os.path.join(seeds_dir, mut, leg, state.num, str(rep)))
 
 def main():
-    make_all_dirs(all_muts)
+    #make_all_dirs(all_muts)
+    if os.path.isdir('./bash_scripts'):
+        pass
+    else:
+        os.makedirs('./bash_scripts')
 
-    os.makedirs('./bash_scripts')
-
-    for i, group in enumerate(chunker(all_muts, 2)):
+    for i, group in enumerate(chunker(all_muts, 4)):
         #make sub script
         with open('./sub{}.sh'.format(i), 'w') as f:
 
@@ -221,7 +223,8 @@ class Window():
 
 if __name__ == '__main__':
     # define mutants
-    all_muts = ['s450l', 'i491f']
+    all_muts = ['s388l', 'i491f', 's450l', 'v170f', 'l443f', 'm434i', 'h445l', 'v359a',
+            'q608l', 'q608k', 'i491m', 'i491s']
 
     # build lambdas
     state_id = [11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13]
@@ -254,10 +257,11 @@ if __name__ == '__main__':
 
     header = '''#!/bin/bash
 #BSUB -P CHM155_001
-#BSUB -W 40
+#BSUB -U COVID19
+#BSUB -W 480
 #BSUB -alloc_flags "gpudefault"
 #BSUB -q batch
-#BSUB -nnodes 44
+#BSUB -nnodes 87
 #BSUB -J {}
 #BSUB -o {}_%J.out
 #BSUB -e {}_test_%J.out
@@ -277,4 +281,5 @@ export OMP_NUM_THREADS=28
 '''
 
     main()
+
 

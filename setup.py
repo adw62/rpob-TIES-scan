@@ -350,7 +350,7 @@ if __name__ == "__main__":
     mutations = get_mutations('./all_muts.dat')
 
     #filer the mutations down, useful to test one at a time
-    filter_ = range(0, 71)
+    filter_ = range(0, 1)
     mutations = [mutations[x] for x in filter_]
 
     #there are two legs to the simulations without and with drug.
@@ -370,6 +370,7 @@ if __name__ == "__main__":
 
     cwd = os.getcwd()
     main()
+
 
 
 
