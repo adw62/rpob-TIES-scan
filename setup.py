@@ -87,7 +87,7 @@ mutation={}
 echo "1
 1" | gmx pdb2gmx -f ../seeds/$mutation/$filestem-chainC-$mutation-0.pdb -o $filestem-chainC-$mutation-1.gro -p $filestem-chainC-$mutation.top -i $filestem-chainC-$mutation\_posre.itp
 
-{}/pmx/scripts/generate_hybrid_topology.py -p $filestem-chainC-$mutation.top -o $filestem-chainC-$mutation-1 -ff amber99sb-star-ildn-mut.ff -noscale_mass -split
+{}/pmx/scripts/generate_hybrid_topology.py -p $filestem-chainC-$mutation.top -o $filestem-chainC-$mutation-1 -ff amber99sb-star-ildn-mut.ff -split
 
     '''.format(GMXRC, filestem, mutation, pmx_root)
 
@@ -160,8 +160,8 @@ def clean_topo(mutation):
     Function to remove some extra lines that are not needed at the end of the topology file
     If these lines are left in there is some conflict about what force fields to use.
 
-    We must also set the masses to be the same in A and B or cant use the
-    GPU update setting losing 15ns/day of performance
+    We can also set the masses to be the same in A and B or cant use the
+    GPU update setting losing 5ns/day of performance
     :param mutation:
     :return:
     '''
@@ -171,18 +171,19 @@ def clean_topo(mutation):
         with open(top_file) as f:
             to_write = f.readlines()[:-10]
 
-        #correct the masses
-        with open(top_file) as ff:
-            count = 0
-            for line in ff:
-                data = line.split()
-                if len(data) > 3:
-                    if data[2] == str(mutation.true_id):
-                        if len(data) > 8:
-                            if float(data[7]) != float(data[10]):
-                                new_mass = str(data[7])+'\n'
-                                to_write[count] = to_write[count][:-8] + new_mass
-                count += 1
+        same_mass = False
+        if same_mass:
+            with open(top_file) as ff:
+                count = 0
+                for line in ff:
+                    data = line.split()
+                    if len(data) > 3:
+                        if data[2] == str(mutation.true_id):
+                            if len(data) > 8:
+                                if float(data[7]) != float(data[10]):
+                                    new_mass = str(data[7])+'\n'
+                                    to_write[count] = to_write[count][:-8] + new_mass
+                    count += 1
 
         #make back into str for writing to file
         to_write = ''.join(to_write)
@@ -350,7 +351,7 @@ if __name__ == "__main__":
     mutations = get_mutations('./all_muts.dat')
 
     #filer the mutations down, useful to test one at a time
-    filter_ = range(0, 1)
+    filter_ = range(0, 5)
     mutations = [mutations[x] for x in filter_]
 
     #there are two legs to the simulations without and with drug.
@@ -370,7 +371,6 @@ if __name__ == "__main__":
 
     cwd = os.getcwd()
     main()
-
 
 
 

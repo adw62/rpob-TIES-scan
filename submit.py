@@ -11,23 +11,60 @@ def make_all_dirs(muts_to_build):
         for leg in legs:
             os.mkdir(os.path.join(seeds_dir, mut, leg))
             for state in lambdas:
-                os.mkdir(os.path.join(seeds_dir, mut, leg, state.num))
+                os.mkdir(os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num)))
                 for rep in reps:
-                    os.mkdir(os.path.join(seeds_dir, mut, leg, state.num, str(rep)))
+                    os.mkdir(os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep)))
+                    os.mkdir(os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep' + str(rep), 'equilibration'))
+                    os.mkdir(os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep' + str(rep), 'simulation'))
+
 
 def main():
-    #make_all_dirs(all_muts)
+    make_all_dirs(all_muts)
     if os.path.isdir('./bash_scripts'):
         pass
     else:
         os.makedirs('./bash_scripts')
 
-    for i, group in enumerate(chunker(all_muts, 4)):
+    for i, group in enumerate(chunker(all_muts, 5)):
         #make sub script
         with open('./sub{}.sh'.format(i), 'w') as f:
 
             header_ = header.format(i, i, i)
             f.write(header_)
+
+            # gromp0
+            for mut in group:
+                for leg in legs:
+                    for state in lambdas:
+                        for rep in reps:
+                            if state.win_type == 'q':
+                                continue
+                            else:
+                                mdp = os.path.join(ref_dir, 'EM-{}.mdp'.format(state.num))
+                                gro = os.path.join(seeds_dir, mut, 'rpob-5uh6-3-md-1-0ns-{}-{}.gro'.format(mut, leg))
+                                top = os.path.join(seeds_dir, mut,
+                                                   'rpob-5uh6-{}-{}-{}.top'.format(mut, leg, state.win_id))
+                                out = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration', 'EM')
+                                run_line = ' '.join([jsrun, gromp, '-f', mdp, '-c', gro, '-p', top,
+                                                     '-o', out, '-po', out + '.mdp', '-maxwarn 2 &\n'])
+                                f.write(run_line)
+            f.write('wait\n')
+
+
+            # minimization of mutant
+            for mut in group:
+                for leg in legs:
+                    for state in lambdas:
+                        for rep in reps:
+                            if state.win_type == 'q':
+                                continue
+                            else:
+                                out = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration', 'EM')
+                                tpr = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration', 'EM.tpr')
+                                run_line = ' '.join([jsrun, gmx_in_cpu.format('false', tpr), gmx_out.format(out), '&\n'])
+                                f.write(run_line)
+            f.write('wait\n')
+
 
             #gromp1
             for mut in group:
@@ -37,14 +74,16 @@ def main():
                             if state.win_type == 'q':
                                 continue
                             else:
+                                root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
                                 mdp = os.path.join(ref_dir, 'alchembed.mdp')
-                                gro = os.path.join(seeds_dir, mut, 'rpob-5uh6-3-md-1-0ns-{}-{}.gro'.format(mut, leg))
+                                gro = os.path.join(root, 'EM.gro')
                                 top = os.path.join(seeds_dir, mut, 'rpob-5uh6-{}-{}-{}.top'.format(mut, leg, state.win_id))
-                                out = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'alchembed')
+                                out = os.path.join(root, 'alchembed')
                                 run_line = ' '.join([jsrun, gromp, '-f', mdp, '-c', gro, '-p', top,
                                                     '-o', out, '-po', out+'.mdp', '-maxwarn 2 &\n'])
                                 f.write(run_line)
             f.write('wait\n')
+
 
             #alchembed
             for mut in group:
@@ -54,11 +93,13 @@ def main():
                             if state.win_type == 'q':
                                 continue
                             else:
-                                out = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'alchembed')
-                                tpr = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'alchembed.tpr')
+                                root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
+                                out = os.path.join(root, 'alchembed')
+                                tpr = os.path.join(root, 'alchembed.tpr')
                                 run_line = ' '.join([jsrun, gmx_in.format('false', tpr), gmx_out.format(out), '&\n'])
                                 f.write(run_line)
             f.write('wait\n')
+
 
             #extract gros
             for mut in group:
@@ -68,7 +109,7 @@ def main():
                             if state.win_type == 'q':
                                 continue
                             else:
-                                root = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                                root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
                                 in_ = os.path.join(root, 'alchembed')
                                 xtc = in_+'.xtc'
                                 gro = os.path.join(root, 'bed_out.gro')
@@ -81,6 +122,7 @@ def main():
                                 f.write(run_line)
             f.write('wait\n')
 
+
             #copy bed grow files from vdw runs to q runs
             for mut in group:
                 for leg in legs:
@@ -88,26 +130,25 @@ def main():
                         for rep in reps:
                             if state.win_type == 'q':
                                 if int(state.num) < 3:
-                                    src = os.path.join(seeds_dir, mut, leg, str(3), str(rep), 'bed_out.gro')
-                                    dest = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                                    src = os.path.join(seeds_dir, mut, leg, 'LAMBDA_'+str(3), 'rep'+str(rep), 'equilibration', 'bed_out.gro')
+                                    dest = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
                                     run_line = ' '.join([jsrun, 'cp {} {}'.format(src, dest), '&\n'])
                                     f.write(run_line)
                                 else:
-                                    src = os.path.join(seeds_dir, mut, leg, str(9), str(rep), 'bed_out.gro')
-                                    dest = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                                    src = os.path.join(seeds_dir, mut, leg, 'LAMBDA_'+str(9), 'rep'+str(rep), 'equilibration', 'bed_out.gro')
+                                    dest = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
                                     run_line = ' '.join([jsrun, 'cp {} {}'.format(src, dest), '&\n'])
                                     f.write(run_line)
                             else:
                                 continue
             f.write('wait\n')
 
-
             #gromp warming sims
             for mut in group:
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            root = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
                             mdp = os.path.join(ref_dir, 'warm-short-{}.mdp'.format(state.num))
                             gro = os.path.join(root, 'bed_out.gro')
                             top = os.path.join(seeds_dir, mut, 'rpob-5uh6-{}-{}-{}.top'.format(mut, leg, state.win_id))
@@ -122,8 +163,9 @@ def main():
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            out = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'warm')
-                            tpr = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'warm.tpr')
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
+                            out = os.path.join(root, 'warm')
+                            tpr = os.path.join(root, 'warm.tpr')
                             run_line = ' '.join([jsrun, gmx_in.format('false', tpr), gmx_out.format(out), '&\n'])
                             f.write(run_line)
             f.write('wait\n')
@@ -133,7 +175,7 @@ def main():
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            root = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
                             mdp = os.path.join(ref_dir, 'NVT-{}'.format(state.num))
                             gro = os.path.join(root, 'warm.gro')
                             top = os.path.join(seeds_dir, mut, 'rpob-5uh6-{}-{}-{}.top'.format(mut, leg, state.win_id))
@@ -149,8 +191,9 @@ def main():
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            out = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'NVT')
-                            tpr = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'NVT.tpr')
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
+                            out = os.path.join(root, 'NVT')
+                            tpr = os.path.join(root, 'NVT.tpr')
                             run_line = ' '.join([jsrun, gmx_in.format('false', tpr), gmx_out.format(out), '&\n'])
                             f.write(run_line)
             f.write('wait\n')
@@ -160,7 +203,7 @@ def main():
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            root = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
                             mdp = os.path.join(ref_dir, 'NPT-{}'.format(state.num))
                             gro = os.path.join(root, 'NVT.gro')
                             top = os.path.join(seeds_dir, mut, 'rpob-5uh6-{}-{}-{}.top'.format(mut, leg, state.win_id))
@@ -176,8 +219,9 @@ def main():
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            out = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'NPT')
-                            tpr = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'NPT.tpr')
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'equilibration')
+                            out = os.path.join(root, 'NPT')
+                            tpr = os.path.join(root, 'NPT.tpr')
                             run_line = ' '.join([jsrun, gmx_in.format('false', tpr), gmx_out.format(out), '&\n'])
                             f.write(run_line)
             f.write('wait\n')
@@ -187,12 +231,12 @@ def main():
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            root = os.path.join(seeds_dir, mut, leg, state.num, str(rep))
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep))
                             mdp = os.path.join(ref_dir, 'prod-{}'.format(state.num))
-                            gro = os.path.join(root, 'NPT.gro')
+                            gro = os.path.join(root, 'equilibration', 'NPT.gro')
                             top = os.path.join(seeds_dir, mut, 'rpob-5uh6-{}-{}-{}.top'.format(mut, leg, state.win_id))
-                            cpt = os.path.join(root, 'NPT.cpt')
-                            out = os.path.join(root, 'prod')
+                            cpt = os.path.join(root, 'equilibration', 'NPT.cpt')
+                            out = os.path.join(root, 'simulation', 'prod')
                             run_line = ' '.join([jsrun, gromp, '-f', mdp, '-c', gro, '-p', top, '-t', cpt,
                                                  '-o', out, '-po', out + '.mdp', '-maxwarn 2 &\n'])
                             f.write(run_line)
@@ -203,14 +247,12 @@ def main():
                 for leg in legs:
                     for state in lambdas:
                         for rep in reps:
-                            out = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'prod')
-                            tpr = os.path.join(seeds_dir, mut, leg, state.num, str(rep), 'prod.tpr')
+                            root = os.path.join(seeds_dir, mut, leg, 'LAMBDA_{}'.format(state.num), 'rep'+str(rep), 'simulation')
+                            out = os.path.join(root, 'prod')
+                            tpr = os.path.join(root, 'prod.tpr')
                             run_line = ' '.join([jsrun, gmx_in.format('false', tpr), gmx_out.format(out), '&\n'])
                             f.write(run_line)
             f.write('wait\n')
-
-
-
 
 class Window():
     def __init__(self, num, lam_val, win_type, win_id, bed_val):
@@ -220,11 +262,44 @@ class Window():
         self.win_id = win_id
         self.bed_val = str(bed_val)
 
+class Mutation():
+    def __init__(self, shift_, og, target, res_id):
+        '''
+        Class to hold infomation about the mutation
+        :param og:str, denoting the letter of the original amino acid
+        :param target:str, denoting the letter of the amino acid we want to mutate to
+        :param res_id:int, denoting the res id in the full stucture
+        :param shift:int, denoting the differnce between the res id in the full structure and the res id in just Chain C
+        '''
+        self.og = og
+        self.target = target
+        self.res_id = res_id
+        self.shift = shift_
+        self.true_id = res_id - shift_
+        self.name = '{}{}{}'.format(og, res_id, target)
+
+def get_mutations(mut_file):
+    all_muts = []
+    with open(mut_file) as f:
+        for line in f:
+            data = line.strip('\n').split(' ')
+            data = [data[0].lower(), data[2].lower(), int(data[1])]
+            all_muts.append(Mutation(shift, *data))
+
+    return all_muts
+
 
 if __name__ == '__main__':
     # define mutants
-    all_muts = ['s388l', 'i491f', 's450l', 'v170f', 'l443f', 'm434i', 'h445l', 'v359a',
-            'q608l', 'q608k', 'i491m', 'i491s']
+    # Build class for each mutation to carry its info
+    shift = 21
+    mutations = get_mutations('./all_muts.dat')
+
+    # filer the mutations down, useful to test one at a time
+    filter_ = range(0, 5)
+    all_muts = [mutations[x].name for x in filter_]
+
+    print(all_muts)
 
     # build lambdas
     state_id = [11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13]
@@ -240,28 +315,29 @@ if __name__ == '__main__':
     # define replicas
     reps = [0, 1, 2, 3, 4]
 
+
     legs = ['apo', 'rfp']
 
     # dir locations
     seeds_dir = '/gpfs/alpine/scratch/adw62/chm155/Phil_work/test_auto/seeds'
     ref_dir = '/gpfs/alpine/scratch/adw62/chm155/Phil_work/test_auto/reference'
 
-
     # run commands
     jsrun = 'jsrun -n 1 -a 1 -c 7 -g 1 -bpacked:7'
     gromp = 'gmx_mpi grompp'
-    gmx_in = 'gmx_mpi mdrun -ntomp 28 -nb gpu -bonded gpu -pme gpu -nstlist 200 -pmefft gpu -update gpu -dlb no' \
+    gmx_in = 'gmx_mpi mdrun -ntomp 28 -nb gpu -bonded gpu -pme gpu -nstlist 200 -pmefft gpu -dlb no' \
              ' -gpu_id 0 -pin on -pinoffset 0 -pinstride 1 -tunepme {} -s {}'
+    gmx_in_cpu = 'gmx_mpi mdrun -ntomp 28'
     gmx_out = '-deffnm {}'
     trajconv = 'echo \"0\" | gmx_mpi trjconv -f {} -dump {} -o {} -s {}'
 
+
     header = '''#!/bin/bash
 #BSUB -P CHM155_001
-#BSUB -U COVID19
-#BSUB -W 480
+#BSUB -W 720
 #BSUB -alloc_flags "gpudefault"
 #BSUB -q batch
-#BSUB -nnodes 87
+#BSUB -nnodes 109
 #BSUB -J {}
 #BSUB -o {}_%J.out
 #BSUB -e {}_test_%J.out
@@ -281,5 +357,4 @@ export OMP_NUM_THREADS=28
 '''
 
     main()
-
 
